@@ -1,35 +1,662 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
   <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>AR Experience</title>
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@100;200;300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      
+      body {
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 200;
+        overflow: hidden;
+        position: relative;
+        height: 100vh;
+        background: #000;
+        color: #fff;
+        opacity: 0;
+        animation: fadeIn 1s ease-out forwards;
+        --accent-color: rgba(255, 255, 255, 0.9);
+      }
+      
+      @keyframes fadeIn {
+        to { opacity: 1; }
+      }
+      
+      #loading {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.9);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 100;
+        transition: opacity 0.5s ease-out;
+        backdrop-filter: blur(8px);
+      }
+      
+      .loading-container {
+        background: rgba(20, 20, 30, 0.6);
+        padding: 2rem 3rem;
+        border-radius: 12px;
+        text-align: center;
+        max-width: 80%;
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      
+      .loading-container h2 {
+        font-weight: 200;
+        margin-bottom: 1.5rem;
+        font-size: 1.2rem;
+        letter-spacing: 1px;
+      }
+      
+      .loading-bar {
+        width: 200px;
+        height: 2px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 2px;
+        overflow: hidden;
+      }
+      
+      .loading-progress {
+        height: 100%;
+        width: 0%;
+        background: var(--accent-color);
+        animation: loading 2.5s ease-in-out infinite;
+      }
+      
+      .logo {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        z-index: 50;
+        opacity: 0.9;
+        transition: opacity 0.3s ease;
+        padding: 10px 20px;
+        background: rgba(20, 20, 30, 0.6);
+        border-radius: 8px;
+        backdrop-filter: blur(5px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      
+      .logo:hover {
+        opacity: 1;
+      }
+      
+      .loader {
+        width: 50px;
+        height: 50px;
+        border: 3px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        border-top-color: #fff;
+        animation: spin 1s ease-in-out infinite;
+        margin-bottom: 30px;
+        position: relative;
+      }
+      
+      .loader::after {
+        content: '';
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        border: 3px solid transparent;
+        border-radius: 50%;
+        border-top-color: rgba(255, 255, 255, 0.6);
+        top: -3px;
+        left: -3px;
+        animation: spin 1.5s ease-in-out infinite;
+      }
+      
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+      
+      #status {
+        position: absolute;
+        bottom: 30px;
+        left: 0;
+        width: 100%;
+        text-align: center;
+        font-family: 'Orbitron', sans-serif;
+        font-size: 1.1em;
+        color: #fff;
+        text-shadow: 0 0 10px rgba(255, 255, 255, 0.7);
+        padding: 15px;
+        background: rgba(0, 0, 0, 0.3);
+        transform: translateY(100px);
+        transition: all 0.5s ease-out;
+        z-index: 10;
+        backdrop-filter: blur(5px);
+        border-top: 1px solid rgba(255, 255, 255, 0.2);
+        opacity: 0;
+      }
+      
+      #status.show {
+        transform: translateY(0);
+        opacity: 1;
+      }
+      
+      #scan-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        pointer-events: none;
+        z-index: 5;
+        opacity: 0;
+        transition: opacity 0.8s ease-out;
+      }
+      
+      #scan-overlay.visible {
+        opacity: 1;
+      }
+      
+      .scan-container {
+        position: relative;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: 100%;
+        height: 100%;
+      }
+      
+      .scan-frame {
+        width: 60%;
+        max-width: 300px;
+        aspect-ratio: 0.7;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: 20px;
+        position: relative;
+        opacity: 0.8;
+        animation: pulse 4s infinite;
+        box-shadow: 0 0 40px rgba(0, 247, 255, 0.2);
+        overflow: hidden;
+      }
+      
+      .scan-frame::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: linear-gradient(90deg, transparent, var(--accent-color), transparent);
+        animation: scanline 3s linear infinite;
+      }
+      
+      .scan-frame::before, .scan-frame::after {
+        content: '';
+        position: absolute;
+        width: 40px;
+        height: 40px;
+        border: 4px solid #00f7ff;
+        border-radius: 8px;
+      }
+      
+      .scan-frame::before {
+        top: -4px;
+        left: -4px;
+        border-right: none;
+        border-bottom: none;
+        border-top-left-radius: 20px;
+      }
+      
+      .scan-frame::after {
+        bottom: -4px;
+        right: -4px;
+        border-left: none;
+        border-top: none;
+        border-bottom-right-radius: 20px;
+      }
+      
+      @keyframes pulse {
+        0% { opacity: 0.5; }
+        50% { opacity: 1; }
+        100% { opacity: 0.5; }
+      }
+      
+      .hidden {
+        display: none !important;
+      }
+      
+      #target-found {
+        position: absolute;
+        top: 30%;
+        left: 0;
+        width: 100%;
+        text-align: center;
+        font-family: 'Orbitron', sans-serif;
+        color: #fff;
+        text-shadow: 0 0 20px rgba(255, 255, 255, 0.8);
+        font-size: 2em;
+        font-weight: 300;
+        letter-spacing: 2px;
+        padding: 20px;
+        background: rgba(0, 0, 0, 0.3);
+        transform: translateY(20px);
+        opacity: 0;
+        transition: all 0.8s ease-out;
+        z-index: 10;
+        backdrop-filter: blur(5px);
+        border-radius: 10px;
+        max-width: 80%;
+        margin: 0 auto;
+      }
+      
+      #target-found.show {
+        transform: translateY(0);
+        opacity: 1;
+      }
+      
+      /* Decorative Elements */
+      .decorative-svg {
+        position: absolute;
+        z-index: 2;
+        opacity: 0;
+        transition: all 0.8s ease-out;
+        pointer-events: none;
+      }
+      
+      .decorative-svg.visible {
+        opacity: 0.8;
+      }
+      
+      .decorative-svg.line-1 {
+        top: 50%;
+        left: calc(50% + 180px);
+        width: 100px;
+        transform: translateY(-50%);
+        animation: float 6s ease-in-out infinite;
+      }
+      
+      .decorative-svg.line-2 {
+        top: 50%;
+        left: calc(50% + 300px);
+        width: 80px;
+        transform: translateY(-50%);
+        animation: float 8s ease-in-out 1s infinite;
+      }
+      
+      .decorative-svg.text-1 {
+        top: 50%;
+        left: calc(50% + 200px);
+        transform: translateY(-50%);
+        width: 100px;
+        text-align: left;
+        animation: float 7s ease-in-out 0.5s infinite;
+      }
+      
+      .decorative-svg.text-2 {
+        top: 50%;
+        left: calc(50% + 320px);
+        transform: translateY(-50%);
+        width: 80px;
+        text-align: left;
+        animation: float 9s ease-in-out 1.5s infinite;
+      }
+      
+      @keyframes float {
+        0%, 100% { transform: translateY(-50%) translateY(-5px); }
+        50% { transform: translateY(-50%) translateY(5px); }
+      }
+      
+      @keyframes scanline {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(100%); }
+      }
+      
+      a-scene {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+      }
+    </style>
   </head>
   <body>
-    <a-scene mindar-image="imageTargetSrc: ./targets.mind;"
-             vr-mode-ui="enabled: false"
-             device-orientation-permission-ui="enabled: false">
-      <a-camera position="0 0 0" look-controls="enabled: false"></a -camera>
-      <a-entity mindar-image-target="targetIndex: 0">
-        <a-text value="CIE"
-                position="0 0.4 0"
-                color="#FFD700"
-                align="center"
-                side="double"
-                font="https://cdn.aframe.io/fonts/Exo2Bold.fnt"
-                scale="0.5 0.5 0.5"
-                ></a-text>
-        <a-video src="cievideo.mp4"
-                 position="0 0 0"
-                 height="0.75"
-                 width="1"
-                 rotation="0 0 0"
-                 autoplay="true"
-                 loop="true"
-                 muted="true"
-                 playsinline="true">
-        </a-video>
+    <!-- Logo SVG -->
+    <div class="logo">
+      <svg width="120" height="40" viewBox="0 0 120 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M20 10L10 30H30L20 10Z" fill="white" fill-opacity="0.8"/>
+        <path d="M40 10L30 30H50L40 10Z" fill="white" fill-opacity="0.6"/>
+        <path d="M60 10L50 30H70L60 10Z" fill="white" fill-opacity="0.4"/>
+        <text x="80" y="25" font-family="'Orbitron', sans-serif" font-size="14" fill="white" fill-opacity="0.8">AR VISION</text>
+      </svg>
+    </div>
+    
+    <div id="loading">
+      <div class="loading-container">
+        <h2>Initializing your AR experience</h2>
+        <div class="loading-bar">
+          <div class="loading-progress"></div>
+        </div>
+      </div>
+    </div>
+    
+    <div id="scan-overlay" class="hidden">
+      <div class="scan-container">
+        <div class="scan-frame"></div>
+      </div>
+    </div>
+    
+    <div id="status">Scanning for target...</div>
+    <div id="target-found">Target Found!</div>
+    
+    <a-scene 
+      mindar-image="imageTargetSrc: ./targets.mind; smooth: true; smoothCount: 10; smoothTolerance: 0.01; smoothThreshold: 0.5;"
+      vr-mode-ui="enabled: false"
+      device-orientation-permission-ui="enabled: false"
+      renderer="colorManagement: true; antialias: true;"
+      loading-screen="enabled: false"
+      stats
+    >
+      <a-assets>
+        <video id="video" preload="auto" loop muted playsinline webkit-playsinline src="cievideo.mp4"></video>
+      </a-assets>
+      
+      <a-camera 
+        position="0 0 0" 
+        look-controls="enabled: false"
+        wasd-controls="enabled: false"
+        cursor="rayOrigin: mouse"
+      ></a-camera>
+      
+      <a-entity id="target" mindar-image-target="targetIndex: 0">
+        <!-- Video Container with Glass Effect -->
+        <a-entity position="0 0 0">
+          <!-- Video -->
+          <a-video 
+            id="ar-video"
+            src="cievideo.mp4"
+            position="0 0 0"
+            height="0.8"
+            width="1.4"
+            rotation="0 0 0"
+            material="shader: flat;"
+            autoplay
+            loop
+            muted
+            playsinline
+          ></a-video>
+          
+          <!-- Glass overlay -->
+          <a-plane
+            position="0 0 0.01"
+            height="0.8"
+            width="1.4"
+            material="shader: flat; color: #fff; opacity: 0.03; transparent: true;"
+          ></a-plane>
+        </a-entity>
+        
+        <!-- 3D Text Container with Glass Effect -->
+        <a-entity position="1.8 0 0">
+          <!-- Glass background -->
+          <a-plane
+            position="0.5 -0.1 0"
+            width="1.8"
+            height="0.7"
+            color="#fff"
+            opacity="0.05"
+            material="shader: flat; transparent: true;"
+            radius="0.1"
+          ></a-plane>
+          
+          <!-- Text Elements -->
+          <a-text 
+            value="AUGMENTED" 
+            position="0 0.2 0.01" 
+            color="#fff" 
+            align="left" 
+            width="1.6"
+            font="mozillavr"
+            shader="msdf"
+            font-weight="100"
+          ></a-text>
+          <a-text 
+            value="REALITY" 
+            position="0 -0.15 0.01" 
+            color="var(--accent-color)" 
+            align="left" 
+            width="1.6"
+            font="mozillavr"
+            shader="msdf"
+            font-weight="100"
+          ></a-text>
+          
+          <!-- Accent line -->
+          <a-plane 
+            position="0.4 -0.25 0.02" 
+            width="1.6" 
+            height="0.01" 
+            color="var(--accent-color)" 
+            opacity="0.5"
+          ></a-plane>
+          
+          <!-- Connection line to target -->
+          <a-entity line="start: -1.4 0 0; end: -2.2 0 0; color: var(--accent-color); opacity: 0.3"></a-entity>
+        </a-entity>
       </a-entity>
+      
+      <!-- Ambient light -->
+      <a-entity light="type: ambient; color: #555"></a-entity>
+      
+      <!-- Directional light -->
+      <a-entity light="type: directional; color: #fff; intensity: 0.8" position="-1 1 1"></a-entity>
+      
     </a-scene>
-    <video id="my-video" src="video.mp4" loop="true" muted="true" playsinline style="display"></video>
+    
+    <!-- Decorative SVG Elements -->
+    <!--<div class="decorative-svg line-1">
+      <svg viewBox="0 0 100 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M0 10H80" stroke="var(--accent-color)" stroke-width="1.5" stroke-dasharray="8 4"/>
+        <circle cx="90" cy="10" r="6" fill="none" stroke="var(--accent-color)" stroke-width="1.5"/>
+        <circle cx="90" cy="10" r="2" fill="var(--accent-color)"/>
+      </svg>
+    </div>-->
+    
+    
+    <script>
+      // Preload video
+      const video = document.createElement('video');
+      video.src = 'cievideo.mp4';
+      video.preload = 'auto';
+      video.muted = true;
+      
+      // Loading animation
+      const progressBar = document.querySelector('.loading-progress');
+      if (progressBar) {
+        progressBar.style.width = '100%';
+      }
+      
+      // Wait for the scene to load
+      document.querySelector('a-scene').addEventListener('loaded', function() {
+        // Hide loading screen with delay
+        setTimeout(() => {
+          const loading = document.getElementById('loading');
+          if (loading) {
+            loading.style.opacity = '0';
+            setTimeout(() => {
+              loading.style.display = 'none';
+            }, 500);
+          }
+          
+          // Start video playback
+          const arVideo = document.querySelector('#ar-video');
+          if (arVideo) {
+            const videoEl = arVideo.components.material.material.map.image;
+            if (videoEl) {
+              videoEl.muted = true;
+              videoEl.play().catch(e => console.log('Video play failed:', e));
+            }
+          }
+        }, 2000);
+        const loading = document.getElementById('loading');
+        const status = document.getElementById('status');
+        const targetFound = document.getElementById('target-found');
+        const scanOverlay = document.getElementById('scan-overlay');
+        const body = document.body;
+        
+        // Fade in the entire page and decorative elements
+        body.style.opacity = '0';
+        setTimeout(() => {
+          body.style.transition = 'opacity 1s ease-out';
+          body.style.opacity = '1';
+          
+          // Show decorative elements with staggered delay
+          const decorativeElements = document.querySelectorAll('.decorative-svg');
+          decorativeElements.forEach((el, index) => {
+            setTimeout(() => {
+              el.classList.add('visible');
+            }, 800 + (index * 200));
+          });
+        }, 100);
+        
+        // Hide loading screen after a short delay
+        setTimeout(() => {
+          loading.style.opacity = '0';
+          
+          // Remove loading screen from DOM after transition
+          setTimeout(() => {
+            loading.style.display = 'none';
+            // Show scan overlay with fade in
+            scanOverlay.classList.add('visible');
+            status.classList.add('show');
+            
+            // Add pulsing animation to status text
+            let pulseCount = 0;
+            const maxPulses = 3;
+            const statusPulse = setInterval(() => {
+              status.style.transform = 'translateY(0) scale(1.05)';
+              setTimeout(() => {
+                status.style.transform = 'translateY(0) scale(1)';
+              }, 300);
+              
+              pulseCount++;
+              if (pulseCount >= maxPulses) {
+                clearInterval(statusPulse);
+              }
+            }, 1000);
+            
+          }, 500);
+        }, 2000);
+        
+        // Get the AR system
+        const scene = document.querySelector('a-scene');
+        
+        // Add event listeners for target found/lost
+        scene.addEventListener('targetFound', event => {
+          console.log('Target found!');
+          status.textContent = 'TARGET LOCKED';
+          
+          // Animate target found text
+          targetFound.style.opacity = '0';
+          targetFound.style.transform = 'translateY(20px)';
+          targetFound.style.display = 'block';
+          
+          setTimeout(() => {
+            targetFound.classList.add('show');
+            targetFound.style.transform = 'translateY(0)';
+            targetFound.style.opacity = '1';
+          }, 50);
+          
+          // Hide scan overlay with fade out
+          scanOverlay.classList.remove('visible');
+          
+          // Add a small animation when target is found
+          const target = document.querySelector('#target');
+          target.setAttribute('animation', 'property: scale; from: 1.1 1.1 1.1; to: 1 1 1; dur: 800; easing: easeOutElastic');
+          
+          // Add subtle glow effect
+          const glow = document.createElement('div');
+          glow.className = 'glow-effect';
+          document.body.appendChild(glow);
+          setTimeout(() => {
+            glow.style.opacity = '0';
+            setTimeout(() => glow.remove(), 1000);
+          }, 50);
+        });
+        
+        scene.addEventListener('targetLost', event => {
+          console.log('Target lost');
+          status.textContent = 'SCANNING...';
+          
+          // Animate target found text out
+          targetFound.style.opacity = '0';
+          targetFound.style.transform = 'translateY(-20px)';
+          
+          // Show scan overlay with fade in
+          setTimeout(() => {
+            scanOverlay.classList.add('visible');
+            targetFound.classList.remove('show');
+          }, 300);
+        });
+        
+        // Add click handler for the video
+        document.addEventListener('DOMContentLoaded', () => {
+          const video = document.querySelector('a-video');
+          if (video) {
+            video.addEventListener('click', (e) => {
+              const videoEl = e.target;
+              if (videoEl.paused) {
+                videoEl.play();
+              } else {
+                videoEl.pause();
+              }
+              
+              // Add click feedback
+              videoEl.setAttribute('animation', 'property: scale; from: 0.95 0.95 0.95; to: 1 1 1; dur: 300; startEvents: click');
+            });
+          }
+        });
+        
+        // Add glow effect style
+        const style = document.createElement('style');
+        style.textContent = `
+          .glow-effect {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at center, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 70%);
+            pointer-events: none;
+            z-index: 5;
+            opacity: 1;
+            transition: opacity 0.5s ease-out;
+          }
+          
+          @media (max-width: 768px) {
+            #target-found {
+              font-size: 1.5em;
+              padding: 15px;
+            }
+            
+            #status {
+              font-size: 1em;
+              padding: 10px;
+            }
+          }
+        `;
+        document.head.appendChild(style);
+      });
+    </script>
   </body>
 </html>
